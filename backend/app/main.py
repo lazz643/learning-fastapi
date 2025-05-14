@@ -2,6 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import SessionLocal, engine
 from app import models, schemas, crud, auth
+from app.models import User
 
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI()
@@ -28,6 +29,14 @@ def login(user: schemas.UserLogin, db: Session = Depends(get_db)):
     access_token = auth.create_access_token(data={"sub": user_db.username})
     return {"access_token": access_token, "token_type": "bearer"}
 
+# @app.post("/products", response_model=schemas.ProductResponse)
+# def create_product(product: schemas.ProductCreate, db: Session = Depends(get_db)):
+#     return crud.create_product(db, product)
+
 @app.post("/products", response_model=schemas.ProductResponse)
-def create_product(product: schemas.ProductCreate, db: Session = Depends(get_db)):
+def create_product(
+    product: schemas.ProductCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth.get_current_user)
+):
     return crud.create_product(db, product)
