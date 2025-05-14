@@ -706,6 +706,66 @@ mutation {
    - updated_at (type: timestamptz, default: now())
 6. Klik "Save"
 
+#### Query SQL untuk Membuat Tabel Purchases
+
+Anda juga bisa menggunakan SQL Editor di Supabase untuk membuat tabel dengan query berikut:
+
+```sql
+-- Membuat tabel purchases
+CREATE TABLE purchases (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT REFERENCES users(id),
+  product_id BIGINT REFERENCES products(id),
+  quantity INTEGER NOT NULL,
+  total_price INTEGER NOT NULL,
+  status TEXT DEFAULT 'pending',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Membuat index untuk mempercepat query
+CREATE INDEX idx_purchases_user_id ON purchases(user_id);
+CREATE INDEX idx_purchases_product_id ON purchases(product_id);
+CREATE INDEX idx_purchases_status ON purchases(status);
+```
+
+#### Query SQL untuk Operasi Umum
+
+```sql
+-- Melihat semua pembelian
+SELECT * FROM purchases;
+
+-- Melihat pembelian untuk user tertentu
+SELECT p.*, pr.name as product_name
+FROM purchases p
+JOIN products pr ON p.product_id = pr.id
+WHERE p.user_id = 1;
+
+-- Melihat detail pembelian dengan informasi produk
+SELECT 
+  p.id, 
+  p.quantity, 
+  p.total_price, 
+  p.status, 
+  p.created_at,
+  pr.name as product_name, 
+  pr.price as product_price,
+  u.username as buyer
+FROM purchases p
+JOIN products pr ON p.product_id = pr.id
+JOIN users u ON p.user_id = u.id
+WHERE p.id = 1;
+
+-- Mengubah status pembelian
+UPDATE purchases
+SET status = 'completed', updated_at = now()
+WHERE id = 1;
+
+-- Menambahkan kolom catatan untuk pembelian (jika diperlukan)
+ALTER TABLE purchases
+ADD COLUMN notes TEXT;
+```
+
 ### 2. Contoh GraphQL untuk Pembelian
 
 #### Membuat Pembelian Baru
