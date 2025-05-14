@@ -70,6 +70,16 @@ Di dashboard Supabase:
    - `created_at` (type: timestamptz, default: now())
    - `updated_at` (type: timestamptz, default: now())
 
+4. Buat tabel bernama "purchases" dengan kolom:
+   - `id` (type: int8, primary key, is identity: true)
+   - `user_id` (type: int8, foreign key ke users.id)
+   - `product_id` (type: int8, foreign key ke products.id)
+   - `quantity` (type: int4)
+   - `total_price` (type: int4)
+   - `status` (type: text, default: 'pending')
+   - `created_at` (type: timestamptz, default: now())
+   - `updated_at` (type: timestamptz, default: now())
+
 ### 6️⃣ Jalankan Aplikasi
 
 ```bash
@@ -115,6 +125,39 @@ mutation {
 }
 ```
 
+Membuat pembelian baru (memerlukan login):
+```graphql
+mutation {
+  createPurchase(
+    purchase: {
+      product_id: 1,
+      quantity: 2
+    },
+    user_id: 1
+  ) {
+    id
+    product_id
+    quantity
+    total_price
+    status
+  }
+}
+```
+
+Melihat semua pembelian pengguna:
+```graphql
+query {
+  userPurchases(user_id: 1) {
+    id
+    product_id
+    quantity
+    total_price
+    status
+    created_at
+  }
+}
+```
+
 ## 📁 Struktur Proyek (Penjelasan Singkat)
 
 ```
@@ -140,8 +183,9 @@ learning-fastapi/
 ## 🐛 Masalah Umum
 
 - **Error "Connection failed" saat test Supabase**: Periksa SUPABASE_URL dan SUPABASE_KEY di file .env
-- **Table not found error**: Pastikan Anda sudah membuat tabel "products" di Supabase
+- **Table not found error**: Pastikan Anda sudah membuat tabel "products" dan "purchases" di Supabase
 - **Module not found**: Pastikan Anda sudah menginstall semua dependensi dengan `pip install -r requirements.txt`
+- **Auth error pada endpoint pembelian**: Pastikan Anda sudah login dan menggunakan token JWT yang valid
 
 ## 📝 Lisensi
 

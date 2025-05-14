@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from typing import Optional
 
 class UserCreate(BaseModel):
     username: str
@@ -30,5 +31,20 @@ class ProductResponse(BaseModel):
     price: int
     stock: int
 
+    class Config:
+        from_attributes = True
+
+class PurchaseCreate(BaseModel):
+    product_id: int
+    quantity: int
+    
+class PurchaseResponse(BaseModel):
+    id: int
+    user_id: int
+    product_id: int
+    quantity: int
+    total_price: int
+    status: str
+    
     class Config:
         from_attributes = True

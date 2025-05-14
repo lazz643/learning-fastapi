@@ -36,3 +36,44 @@ def create_product(db: Session, product: schemas.ProductCreate):
     db.commit()
     db.refresh(db_product)
     return db_product
+
+def get_product(db: Session, product_id: int):
+    return db.query(models.Product).filter(models.Product.id == product_id).first()
+
+def create_purchase(db: Session, purchase: schemas.PurchaseCreate, user_id: int):
+    # Get the product
+    product = get_product(db, purchase.product_id)
+    if not product or product.stock < purchase.quantity:
+        return None
+    
+    # Calculate total price
+    total_price = product.price * purchase.quantity
+    
+    # Create purchase record
+    db_purchase = models.Purchase(
+        user_id=user_id,
+        product_id=purchase.product_id,
+        quantity=purchase.quantity,
+        total_price=total_price,
+        status="pending"
+    )
+    
+    # Update product stock
+    product.stock -= purchase.quantity
+    
+    # Commit changes
+    db.add(db_purchase)
+    db.commit()
+    db.refresh(db_purchase)
+    return db_purchase
+
+def get_user_purchases(db: Session, user_id: int):
+    return db.query(models.Purchase).filter(models.Purchase.user_id == user_id).all()
+
+def update_purchase_status(db: Session, purchase_id: int, status: str):
+    db_purchase = db.query(models.Purchase).filter(models.Purchase.id == purchase_id).first()
+    if db_purchase:
+        db_purchase.status = status
+        db.commit()
+        db.refresh(db_purchase)
+    return db_purchase

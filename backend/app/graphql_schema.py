@@ -49,6 +49,18 @@ class Product:
     created_at: str
     updated_at: str
 
+@strawberry.type
+class Purchase:
+    """Representasi data pembelian."""
+    id: int
+    user_id: int
+    product_id: int
+    quantity: int
+    total_price: int
+    status: str
+    created_at: str
+    updated_at: str
+
 # ======= TIPE INPUT =======
 # Digunakan untuk operasi pembuatan/pembaruan data
 # @strawberry.input menandakan ini adalah tipe input GraphQL
@@ -67,6 +79,12 @@ class ProductInput:
     description: str
     price: int
     stock: int
+
+@strawberry.input
+class PurchaseInput:
+    """Format data untuk pembelian produk."""
+    product_id: int
+    quantity: int
 
 # ======= QUERY RESOLVERS =======
 # Fungsi-fungsi untuk membaca data dari database
@@ -111,6 +129,33 @@ class Query:
         response = supabase.table("products").select("*").execute()
         # Konversi setiap baris data menjadi objek Product
         return [Product(**product) for product in response.data]
+    
+    @strawberry.field
+    def purchase(self, id: int) -> Optional[Purchase]:
+        """Mendapatkan satu pembelian berdasarkan ID."""
+        # Mencari pembelian dengan ID yang diberikan di tabel purchases
+        response = supabase.table("purchases").select("*").eq("id", id).execute()
+        # Jika ditemukan, konversi ke objek Purchase
+        if response.data:
+            return Purchase(**response.data[0])
+        # Jika tidak ditemukan, kembalikan None
+        return None
+    
+    @strawberry.field
+    def purchases(self) -> List[Purchase]:
+        """Mendapatkan semua pembelian."""
+        # Mengambil semua data dari tabel purchases
+        response = supabase.table("purchases").select("*").execute()
+        # Konversi setiap baris data menjadi objek Purchase
+        return [Purchase(**purchase) for purchase in response.data]
+    
+    @strawberry.field
+    def user_purchases(self, user_id: int) -> List[Purchase]:
+        """Mendapatkan semua pembelian dari satu pengguna."""
+        # Mengambil data pembelian berdasarkan user_id
+        response = supabase.table("purchases").select("*").eq("user_id", user_id).execute()
+        # Konversi setiap baris data menjadi objek Purchase
+        return [Purchase(**purchase) for purchase in response.data]
 
 # ======= MUTATION RESOLVERS =======
 # Fungsi-fungsi untuk memodifikasi data di database
@@ -163,6 +208,67 @@ class Mutation:
         response = supabase.table("products").delete().eq("id", id).execute()
         # Kembalikan True jika berhasil dihapus, False jika tidak
         return len(response.data) > 0
+    
+    @strawberry.mutation
+    def create_purchase(self, purchase: PurchaseInput, user_id: int) -> Optional[Purchase]:
+        """Membuat pembelian baru."""
+        # Dapatkan produk yang ingin dibeli
+        product_response = supabase.table("products").select("*").eq("id", purchase.product_id).execute()
+        
+        if not product_response.data:
+            return None  # Produk tidak ditemukan
+            
+        product = product_response.data[0]
+        
+        # Periksa stok
+        if product["stock"] < purchase.quantity:
+            return None  # Stok tidak cukup
+            
+        # Hitung total harga
+        total_price = product["price"] * purchase.quantity
+        
+        # Dapatkan waktu saat ini dalam format ISO
+        now = datetime.now().isoformat()
+        
+        # Siapkan data pembelian
+        purchase_data = {
+            "user_id": user_id,
+            "product_id": purchase.product_id,
+            "quantity": purchase.quantity,
+            "total_price": total_price,
+            "status": "pending",
+            "created_at": now,
+            "updated_at": now
+        }
+        
+        # Insert data ke tabel purchases
+        purchase_response = supabase.table("purchases").insert(purchase_data).execute()
+        
+        # Update stok produk
+        updated_stock = product["stock"] - purchase.quantity
+        supabase.table("products").update({"stock": updated_stock, "updated_at": now}).eq("id", purchase.product_id).execute()
+        
+        # Return data pembelian
+        return Purchase(**purchase_response.data[0])
+    
+    @strawberry.mutation
+    def update_purchase_status(self, id: int, status: str) -> Optional[Purchase]:
+        """Memperbarui status pembelian."""
+        # Periksa apakah status valid
+        valid_statuses = ["pending", "completed", "cancelled"]
+        if status not in valid_statuses:
+            return None
+            
+        # Update status di database
+        response = supabase.table("purchases").update({
+            "status": status,
+            "updated_at": datetime.now().isoformat()
+        }).eq("id", id).execute()
+        
+        # Kembalikan data pembelian yang diupdate
+        if response.data:
+            return Purchase(**response.data[0])
+        return None
 
 # Buat skema GraphQL yang menggabungkan Query dan Mutation
 # Schema ini yang akan digunakan oleh FastAPI untuk membuat endpoint GraphQL

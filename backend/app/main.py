@@ -145,3 +145,55 @@ def create_product(product: schemas.ProductCreate, db: Session = Depends(get_db)
     except Exception as e:
         logger.error(f"Error in create_product endpoint: {e}")
         raise HTTPException(status_code=500, detail="Internal server error, try using GraphQL API")
+
+@app.post("/purchases", response_model=schemas.PurchaseResponse, tags=["Purchases"])
+async def create_purchase(
+    purchase: schemas.PurchaseCreate, 
+    db: Session = Depends(get_db),
+    current_user = Depends(auth.get_current_user)
+):
+    """
+    Endpoint untuk membuat pembelian baru.
+    
+    - Request body: ID produk dan jumlah yang dibeli
+    - Memerlukan autentikasi: Ya (token JWT)
+    - Returns: Data pembelian yang berhasil dibuat
+    """
+    try:
+        # Dapatkan ID pengguna dari token
+        user = crud.get_user_by_username(db, current_user.username)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+            
+        # Buat pembelian baru
+        db_purchase = crud.create_purchase(db, purchase, user.id)
+        if not db_purchase:
+            raise HTTPException(status_code=400, detail="Invalid product or insufficient stock")
+            
+        return db_purchase
+    except Exception as e:
+        logger.error(f"Error in create_purchase endpoint: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error, try using GraphQL API")
+
+@app.get("/purchases/me", response_model=list[schemas.PurchaseResponse], tags=["Purchases"])
+async def read_user_purchases(
+    db: Session = Depends(get_db),
+    current_user = Depends(auth.get_current_user)
+):
+    """
+    Endpoint untuk melihat riwayat pembelian pengguna.
+    
+    - Memerlukan autentikasi: Ya (token JWT)
+    - Returns: Daftar pembelian yang dilakukan oleh pengguna
+    """
+    try:
+        # Dapatkan ID pengguna dari token
+        user = crud.get_user_by_username(db, current_user.username)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+            
+        # Dapatkan riwayat pembelian
+        return crud.get_user_purchases(db, user.id)
+    except Exception as e:
+        logger.error(f"Error in read_user_purchases endpoint: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error, try using GraphQL API")
