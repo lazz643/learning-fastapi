@@ -1,18 +1,42 @@
-# Template untuk File .env
+# Panduan Membuat File `.env`
 
-Salin konten di bawah ini ke file `.env` baru di folder `backend/`:
+## 🔐 Apa itu File `.env`?
 
-```
-# Supabase Configuration
+File `.env` adalah file **rahasia** yang berisi *environment variables* (variabel lingkungan) seperti kredensial API, password, dan pengaturan rahasia lainnya. File ini **TIDAK** disimpan di Git/GitHub karena berisi informasi sensitif.
+
+## 📋 Langkah-langkah
+
+1. Buat file baru bernama **`.env`** (persis seperti ini, dengan titik di depan) di folder `backend/`
+2. Salin kode di bawah ini ke dalam file tersebut
+3. Ganti semua nilai contoh dengan nilai asli dari akun Supabase Anda
+
+## 📝 Template
+
+```env
+# ===== KONFIGURASI SUPABASE =====
+# URL dari project Supabase Anda
+# Contoh: https://abcdefghijklm.supabase.co
 SUPABASE_URL=your_supabase_url_here
-SUPABASE_KEY=your_supabase_key_here
 
-# JWT Authentication
-SECRET_KEY=your_secret_key_here
+# API Key Supabase (anon/public key)
+# Dapatkan dari: Dashboard Supabase > Settings > API > Project API keys
+# Contoh: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+SUPABASE_KEY=your_supabase_anon_key
+
+# ===== KONFIGURASI JWT =====
+# Secret key untuk JWT (gunakan string acak yang aman)
+# PENTING: Buat sendiri, jangan gunakan contoh ini!
+SECRET_KEY=generate-random-secret-key
+
+# Algoritma enkripsi untuk JWT (biarkan HS256)
 ALGORITHM=HS256
+
+# Masa berlaku token dalam menit
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 
-# Optional: Database configuration (jika menggunakan SQLAlchemy)
+# ===== KONFIGURASI DATABASE (OPSIONAL) =====
+# Bagian ini hanya diperlukan jika Anda menggunakan MySQL
+# Jika hanya menggunakan Supabase, bisa dikomentar dengan #
 # DB_USERNAME=username
 # DB_PASSWORD=password
 # DB_HOST=localhost
@@ -20,13 +44,26 @@ ACCESS_TOKEN_EXPIRE_MINUTES=30
 # DB_PORT=3306
 ```
 
-## Catatan Penting
+## ⚠️ Cara Membuat Secret Key yang Aman
 
-1. File `.env` berisi informasi sensitif dan TIDAK disertakan dalam repositori Git.
-2. Setiap kali Anda melakukan clone proyek ini, Anda HARUS membuat file `.env` Anda sendiri.
-3. Dapatkan kredensial Supabase Anda dari dashboard Supabase di [https://app.supabase.com](https://app.supabase.com).
-4. Untuk `SECRET_KEY`, gunakan string acak yang aman, misalnya dengan menjalankan perintah Python berikut:
-   ```python
-   import secrets
-   print(secrets.token_hex(32))
-   ``` 
+Secret key adalah rahasia yang digunakan untuk enkripsi token JWT. Penting untuk menggunakan key yang acak dan aman.
+
+Untuk membuat secret key yang aman, jalankan perintah Python berikut:
+
+```python
+import secrets
+print(secrets.token_hex(32))
+# Output contoh: 8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92
+```
+
+## 🚨 Peringatan Penting
+
+1. **JANGAN PERNAH** mengunggah file `.env` ke Git/GitHub!
+2. **JANGAN PERNAH** membagikan isi file `.env` kepada orang lain!
+3. Jika kredensial Anda terlanjur terekspos, segera ganti di dashboard Supabase.
+
+## 🔄 Cara Setup untuk Lingkungan Berbeda
+
+Untuk pengembangan di lingkungan berbeda, Anda bisa membuat beberapa file seperti:
+- `.env.development` - untuk pengembangan lokal
+- `.env.production` - untuk server produksi
