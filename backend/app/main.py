@@ -27,3 +27,7 @@ def login(user: schemas.UserLogin, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Invalid credentials")
     access_token = auth.create_access_token(data={"sub": user_db.username})
     return {"access_token": access_token, "token_type": "bearer"}
+
+@app.post("/products", response_model=schemas.ProductResponse)
+def create_product(product: schemas.ProductCreate, db: Session = Depends(get_db)):
+    return crud.create_product(db, product)

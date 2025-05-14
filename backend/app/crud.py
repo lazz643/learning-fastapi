@@ -24,3 +24,15 @@ def authenticate_user(db: Session, username: str, password: str):
     if not user or not pwd_context.verify(password, user.hashed_password):
         return None
     return user
+
+def create_product(db: Session, product: schemas.ProductCreate):
+    db_product = models.Product(
+        name=product.name,
+        description=product.description,
+        price=product.price,
+        stock=product.stock
+    )
+    db.add(db_product)
+    db.commit()
+    db.refresh(db_product)
+    return db_product
