@@ -6,3 +6,5 @@ python-dotenv
 alembic
 passlib[bcrypt]
 python-jose
+supabase==1.0.3
+strawberry-graphql[fastapi]>=0.158.0

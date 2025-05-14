@@ -6,14 +6,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DB_USERNAME = os.getenv("DB_USERNAME")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
-DB_HOST = os.getenv("DB_HOST")
-DB_NAME = os.getenv("DB_NAME")
-DB_PORT = os.getenv("DB_PORT") 
-
-DATABASE_URL = f"mysql+pymysql://{DB_USERNAME}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-
-engine = create_engine(DATABASE_URL)
+# Dummy SQLAlchemy setup (tidak benar-benar terhubung ke database)
+# Ini untuk menjaga kompatibilitas dengan kode yang ada
+engine = create_engine("sqlite:///:memory:")
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+
+# Kita akan menggunakan Supabase untuk operasi database sebenarnya
+# Lihat file app/supabase_client.py untuk koneksi Supabase
