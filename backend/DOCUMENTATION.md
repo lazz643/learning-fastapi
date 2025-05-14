@@ -8,7 +8,8 @@
 5. [Autentikasi](#autentikasi)
 6. [API Endpoints](#api-endpoints)
 7. [Contoh Penggunaan](#contoh-penggunaan)
-8. [Troubleshooting](#troubleshooting)
+8. [Fitur Pembelian](#fitur-pembelian)
+9. [Troubleshooting](#troubleshooting)
 
 ## Struktur Proyek
 
@@ -163,6 +164,7 @@ def delete_supabase_product(product_id: int):
 File: `backend/app/schemas.py`
 ```python
 from pydantic import BaseModel
+from typing import Optional
 
 class UserCreate(BaseModel):
     username: str
@@ -196,6 +198,62 @@ class ProductResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class PurchaseCreate(BaseModel):
+    product_id: int
+    quantity: int
+    
+class PurchaseResponse(BaseModel):
+    id: int
+    user_id: int
+    product_id: int
+    quantity: int
+    total_price: int
+    status: str
+    
+    class Config:
+        from_attributes = True
+```
+
+### Model SQLAlchemy
+
+File: `backend/app/models.py`
+```python
+from sqlalchemy import Column, Integer, String, DateTime, func, ForeignKey
+from app.database import Base
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(50), unique=True, index=True)
+    email = Column(String(100), unique=True, index=True)
+    hashed_password = Column(String(255))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
+    
+class Product(Base):
+    __tablename__ = "products"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), index=True)
+    description = Column(String(255))
+    price = Column(Integer)
+    stock = Column(Integer)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
+
+class Purchase(Base):
+    __tablename__ = "purchases"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    product_id = Column(Integer, ForeignKey("products.id"))
+    quantity = Column(Integer)
+    total_price = Column(Integer)
+    status = Column(String(50), default="pending")  # pending, completed, cancelled
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
 ```
 
 ## GraphQL
@@ -228,6 +286,17 @@ class Product:
     created_at: str
     updated_at: str
 
+@strawberry.type
+class Purchase:
+    id: int
+    user_id: int
+    product_id: int
+    quantity: int
+    total_price: int
+    status: str
+    created_at: str
+    updated_at: str
+
 # Input types
 @strawberry.input
 class UserInput:
@@ -241,6 +310,11 @@ class ProductInput:
     description: str
     price: int
     stock: int
+
+@strawberry.input
+class PurchaseInput:
+    product_id: int
+    quantity: int
 
 # Query resolvers
 @strawberry.type
@@ -268,6 +342,23 @@ class Query:
     def products(self) -> List[Product]:
         response = supabase.table("products").select("*").execute()
         return [Product(**product) for product in response.data]
+
+    @strawberry.field
+    def purchase(self, id: int) -> Optional[Purchase]:
+        response = supabase.table("purchases").select("*").eq("id", id).execute()
+        if response.data:
+            return Purchase(**response.data[0])
+        return None
+    
+    @strawberry.field
+    def purchases(self) -> List[Purchase]:
+        response = supabase.table("purchases").select("*").execute()
+        return [Purchase(**purchase) for purchase in response.data]
+    
+    @strawberry.field
+    def user_purchases(self, user_id: int) -> List[Purchase]:
+        response = supabase.table("purchases").select("*").eq("user_id", user_id).execute()
+        return [Purchase(**purchase) for purchase in response.data]
 
 # Mutation resolvers
 @strawberry.type
@@ -304,6 +395,65 @@ class Mutation:
     def delete_product(self, id: int) -> bool:
         response = supabase.table("products").delete().eq("id", id).execute()
         return len(response.data) > 0
+
+    @strawberry.mutation
+    def create_purchase(self, purchase: PurchaseInput, user_id: int) -> Optional[Purchase]:
+        # Get the product
+        product_response = supabase.table("products").select("*").eq("id", purchase.product_id).execute()
+        
+        if not product_response.data:
+            return None  # Product not found
+            
+        product = product_response.data[0]
+        
+        # Check stock
+        if product["stock"] < purchase.quantity:
+            return None  # Insufficient stock
+            
+        # Calculate total price
+        total_price = product["price"] * purchase.quantity
+        
+        # Current time in ISO format
+        now = datetime.now().isoformat()
+        
+        # Purchase data
+        purchase_data = {
+            "user_id": user_id,
+            "product_id": purchase.product_id,
+            "quantity": purchase.quantity,
+            "total_price": total_price,
+            "status": "pending",
+            "created_at": now,
+            "updated_at": now
+        }
+        
+        # Insert purchase record
+        purchase_response = supabase.table("purchases").insert(purchase_data).execute()
+        
+        # Update product stock
+        updated_stock = product["stock"] - purchase.quantity
+        supabase.table("products").update({"stock": updated_stock, "updated_at": now}).eq("id", purchase.product_id).execute()
+        
+        # Return purchase data
+        return Purchase(**purchase_response.data[0])
+    
+    @strawberry.mutation
+    def update_purchase_status(self, id: int, status: str) -> Optional[Purchase]:
+        # Valid status values
+        valid_statuses = ["pending", "completed", "cancelled"]
+        if status not in valid_statuses:
+            return None
+            
+        # Update purchase status
+        response = supabase.table("purchases").update({
+            "status": status,
+            "updated_at": datetime.now().isoformat()
+        }).eq("id", id).execute()
+        
+        # Return updated purchase
+        if response.data:
+            return Purchase(**response.data[0])
+        return None
 
 # Create the schema
 schema = strawberry.Schema(query=Query, mutation=Mutation)
@@ -537,6 +687,110 @@ mutation {
 }
 ```
 
+## Fitur Pembelian
+
+### 1. Membuat Tabel Purchases di Supabase
+
+1. Login ke [Supabase Dashboard](https://app.supabase.com)
+2. Pilih project Anda
+3. Klik "Table Editor" di sidebar
+4. Klik "Create a new table"
+5. Buat tabel "purchases" dengan kolom:
+   - id (type: int8, primary, identity)
+   - user_id (type: int8, foreign key ke users.id)
+   - product_id (type: int8, foreign key ke products.id)
+   - quantity (type: int4)
+   - total_price (type: int4)
+   - status (type: text, default: 'pending')
+   - created_at (type: timestamptz, default: now())
+   - updated_at (type: timestamptz, default: now())
+6. Klik "Save"
+
+### 2. Contoh GraphQL untuk Pembelian
+
+#### Membuat Pembelian Baru
+
+```graphql
+mutation {
+  createPurchase(
+    purchase: {
+      product_id: 1,
+      quantity: 2
+    },
+    user_id: 1
+  ) {
+    id
+    product_id
+    quantity
+    total_price
+    status
+    created_at
+  }
+}
+```
+
+#### Melihat Semua Pembelian
+
+```graphql
+query {
+  purchases {
+    id
+    user_id
+    product_id
+    quantity
+    total_price
+    status
+    created_at
+  }
+}
+```
+
+#### Melihat Pembelian Pengguna Tertentu
+
+```graphql
+query {
+  userPurchases(user_id: 1) {
+    id
+    product_id
+    quantity
+    total_price
+    status
+    created_at
+  }
+}
+```
+
+#### Mengubah Status Pembelian
+
+```graphql
+mutation {
+  updatePurchaseStatus(
+    id: 1,
+    status: "completed"
+  ) {
+    id
+    status
+    updated_at
+  }
+}
+```
+
+### 3. REST API untuk Pembelian
+
+Endpoint | Method | Fungsi
+---------|--------|-------
+`/purchases` | POST | Membuat pembelian baru (memerlukan autentikasi)
+`/purchases/me` | GET | Mendapatkan daftar pembelian pengguna yang login (memerlukan autentikasi)
+
+#### Contoh Request untuk Membuat Pembelian
+
+```bash
+curl -X POST "http://localhost:8000/purchases" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -d '{"product_id": 1, "quantity": 2}'
+```
+
 ## Troubleshooting
 
 ### 1. Supabase Connection Issues
@@ -555,6 +809,12 @@ mutation {
 
 - Jika menggunakan fitur SQLAlchemy, periksa .env untuk konfigurasi database
 - Database.py telah dimodifikasi untuk tidak memerlukan MySQL dan fokus pada Supabase
+
+### 4. Masalah Pembelian
+
+- **Invalid product or insufficient stock**: Pastikan produk ada dan memiliki stok cukup
+- **Auth error pada endpoint pembelian**: Pastikan token JWT valid dan disertakan di header
+- **Status tidak berubah**: Pastikan menggunakan nilai status yang valid (pending, completed, cancelled)
 
 ---
 
