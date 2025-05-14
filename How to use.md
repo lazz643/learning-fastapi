@@ -28,3 +28,5 @@ ini adalah proyek pembelajaran crud fastapi
 
 - Run the backend server with:
   => uvicorn app.main:app --reload
+  or
+  => make run_server
